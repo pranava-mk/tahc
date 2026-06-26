@@ -77,9 +77,31 @@ export function useRoom(slug) {
           { event: 'INSERT', schema: 'public', table: 'messages', filter: `session_id=eq.${s.session_id}` },
           (payload) => setMessages((prev) => prev.some((m) => m.id === payload.new.id) ? prev : [...prev, mapMessage(payload.new)]))
         .subscribe()
+
+      // Reconcile messages posted during the brief subscription-setup gap.
+      setTimeout(async () => {
+        if (cancelled) return
+        const { data: recent } = await supabase
+          .from('messages').select('id, display_name, content, type, sent_at')
+          .eq('session_id', s.session_id).order('sent_at', { ascending: true })
+        if (recent) setMessages((prev) => {
+          const ids = new Set(prev.map((m) => m.id))
+          const add = recent.filter((r) => !ids.has(r.id)).map(mapMessage)
+          return add.length ? [...prev, ...add].sort((a, b) => a.timestamp - b.timestamp) : prev
+        })
+      }, 1800)
     })()
     return () => { cancelled = true; cleanupChannel() }
   }, [slug, cleanupChannel])
+
+  // Nudge the bots to react quickly to a human (debounced) so it feels live.
+  const lastPoke = useRef(0)
+  const pokeBots = useCallback(() => {
+    const now = Date.now()
+    if (now - lastPoke.current < 3000) return
+    lastPoke.current = now
+    fetch(`${FUNCTIONS_URL}/bot-tick`, { method: 'POST', headers: { Authorization: `Bearer ${ANON}` } }).catch(() => {})
+  }, [])
 
   // Countdown → end. Slug expires, so we DON'T rejoin; we show the ended state.
   useEffect(() => {
@@ -125,7 +147,8 @@ export function useRoom(slug) {
       .select('id, display_name, content, type, sent_at').single()
     if (error) { console.error('[useRoom] send failed:', error); return }
     if (data) setMessages((prev) => prev.some((m) => m.id === data.id) ? prev : [...prev, mapMessage(data)])
-  }, [flashNotice])
+    pokeBots() // let the bots react fast
+  }, [flashNotice, pokeBots])
 
   const inviteUrl = session ? `${window.location.origin}/${session.slug ?? slug}` : ''
 

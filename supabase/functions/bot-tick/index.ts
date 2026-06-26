@@ -10,8 +10,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { nextSpeakAt, scriptedFallback } from '../_shared/botPersonalities.ts'
 import { generateAiReply } from '../_shared/voidaiClient.ts'
 
-const MAX_PER_ROOM_TICK = 2
-const GLOBAL_CAP = 8
+const MAX_PER_ROOM_TICK = 3
+const GLOBAL_CAP = 10
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

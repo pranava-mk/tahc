@@ -92,16 +92,22 @@ Deno.serve(async (req) => {
       .eq('session_id', session.id)
       .is('left_at', null)
 
-    // Start a fresh session immediately (zero downtime) with new bots.
-    const { data: next, error: nextErr } = await supabase
-      .from('sessions')
-      .insert({ topic: pickTopic() })
-      .select('id')
-      .single()
-    if (nextErr) throw nextErr
-    await supabase.from('participants').insert(seedBotRows(next.id))
+    // Hand off a fresh session immediately (zero downtime) ONLY if real users
+    // were here. Empty / bot-only rooms just end — join-session recreates one
+    // when the next person arrives. Without this, the cron would rotate an
+    // abandoned room forever.
+    if ((realUsers ?? 0) > 0) {
+      const { data: next, error: nextErr } = await supabase
+        .from('sessions')
+        .insert({ topic: pickTopic() })
+        .select('id')
+        .single()
+      if (nextErr) throw nextErr
+      await supabase.from('participants').insert(seedBotRows(next.id))
+      return json({ rotated: true, new_session_id: next.id, archived_messages: archive.messages.length })
+    }
 
-    return json({ rotated: true, new_session_id: next.id, archived_messages: archive.messages.length })
+    return json({ rotated: true, ended_empty: true, archived_messages: archive.messages.length })
   } catch (err) {
     console.error('[end-session]', err)
     return json({ error: 'internal', detail: String(err) }, 500)

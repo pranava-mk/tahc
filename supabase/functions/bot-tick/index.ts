@@ -1,17 +1,17 @@
-// bot-tick — drives the bots. Called on a schedule (cron) and optionally when a
-// human sends a message. Server-authoritative, idempotent per tick.
+// bot-tick — drives the themed AI bots across ALL active rooms. Called on a
+// fast cron (and optionally when a human sends). Server-authoritative.
 //
 // Cost controls:
-//  - only the 2 AI-typed bots ever call voidai; the other 4 are free scripted
-//  - AI is skipped entirely when no real user is present (no burning credits on
-//    empty / bot-only rooms)
-//  - at most 1 AI call per tick; everything else is a free scripted line
+//  - AI only when a real user is present in that room (empty rooms = no calls)
+//  - <= 2 bot messages per room per tick, and a global cap across rooms
+//  - scripted one-liner fallback only if an AI call fails
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { personalityById, scriptedReply } from '../_shared/botPersonalities.ts'
+import { nextSpeakAt, scriptedFallback } from '../_shared/botPersonalities.ts'
 import { generateAiReply } from '../_shared/voidaiClient.ts'
 
-const MAX_AI_CALLS_PER_TICK = 1
+const MAX_PER_ROOM_TICK = 2
+const GLOBAL_CAP = 8
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -21,102 +21,102 @@ const cors = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
 
-function nextSpeakAt(min: number, max: number): string {
-  const secs = min + Math.random() * (max - min)
-  return new Date(Date.now() + secs * 1000).toISOString()
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
   try {
-    const { data: session } = await supabase
+    const { data: sessions } = await supabase
       .from('sessions')
-      .select('id, topic')
+      .select('id, theme')
       .eq('is_active', true)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (!session) return json({ ticked: false, reason: 'no_active_session' })
+    if (!sessions || sessions.length === 0) return json({ ticked: true, rooms: 0 })
 
     const nowIso = new Date().toISOString()
+    let totalPosted = 0
+    let totalAi = 0
 
-    // Due bots for this session.
-    const { data: dueBots } = await supabase
-      .from('participants')
-      .select('id, display_name, bot_state')
-      .eq('session_id', session.id)
-      .eq('is_bot', true)
-      .lte('bot_state->>next_speak_at', nowIso)
-    if (!dueBots || dueBots.length === 0) return json({ ticked: true, posted: 0 })
+    for (const session of sessions) {
+      if (totalAi >= GLOBAL_CAP) break
 
-    // Is a real user present? Gates whether AI bots may call the API.
-    const { count: realUsers } = await supabase
-      .from('participants')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', session.id)
-      .eq('is_bot', false)
-      .is('left_at', null)
-    const humansPresent = (realUsers ?? 0) > 0
-
-    // Recent context for replies.
-    const { data: recentDesc } = await supabase
-      .from('messages')
-      .select('display_name, content')
-      .eq('session_id', session.id)
-      .order('sent_at', { ascending: false })
-      .limit(10)
-    const recent = (recentDesc ?? []).reverse()
-
-    let posted = 0
-    let aiCalls = 0
-
-    for (const bot of dueBots) {
-      const pid = bot.bot_state?.personality_id
-      const personality = pid ? personalityById(pid) : undefined
-      if (!personality) continue
-
-      let content: string
-      if (personality.type === 'ai' && humansPresent && aiCalls < MAX_AI_CALLS_PER_TICK) {
-        aiCalls++
-        try {
-          content = await generateAiReply(personality, bot.display_name, session.topic ?? 'random stuff', recent)
-        } catch (_e) {
-          content = scriptedReply(personality, recent) // free fallback
-        }
-      } else {
-        content = scriptedReply(personality, recent)
-      }
-
-      await supabase.from('messages').insert({
-        session_id: session.id,
-        participant_id: bot.id,
-        display_name: bot.display_name,
-        content,
-        type: 'chat',
-      })
-
-      const sent = (bot.bot_state?.messages_sent ?? 0) + 1
-      await supabase
+      // Only spend API on LIVE rooms: a real person joined or messaged in the
+      // last 5 min. Abandoned rooms go quiet (frees the global cap; the cron
+      // ends them at 11 min anyway).
+      const fiveAgo = new Date(Date.now() - 5 * 60 * 1000)
+      const { data: humans } = await supabase
         .from('participants')
-        .update({
-          bot_state: {
-            ...bot.bot_state,
-            next_speak_at: nextSpeakAt(personality.cadence.minSeconds, personality.cadence.maxSeconds),
-            messages_sent: sent,
-          },
-        })
-        .eq('id', bot.id)
+        .select('id, joined_at')
+        .eq('session_id', session.id)
+        .eq('is_bot', false)
+        .is('left_at', null)
+      if (!humans || humans.length === 0) continue
+      let live = humans.some((h) => new Date(h.joined_at) > fiveAgo)
+      if (!live) {
+        const { count: recentHuman } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('session_id', session.id)
+          .in('participant_id', humans.map((h) => h.id))
+          .gt('sent_at', fiveAgo.toISOString())
+        live = (recentHuman ?? 0) > 0
+      }
+      if (!live) continue
 
-      posted++
+      // Due bots, soonest first.
+      const { data: due } = await supabase
+        .from('participants')
+        .select('id, display_name, bot_state')
+        .eq('session_id', session.id)
+        .eq('is_bot', true)
+        .lte('bot_state->>next_speak_at', nowIso)
+        .order('bot_state->>next_speak_at', { ascending: true })
+        .limit(MAX_PER_ROOM_TICK)
+      if (!due || due.length === 0) continue
+
+      const { data: recentDesc } = await supabase
+        .from('messages')
+        .select('display_name, content')
+        .eq('session_id', session.id)
+        .order('sent_at', { ascending: false })
+        .limit(12)
+      const recent = (recentDesc ?? []).reverse()
+
+      for (const bot of due) {
+        if (totalAi >= GLOBAL_CAP) break
+        let content: string
+        try {
+          content = await generateAiReply(bot.display_name, session.theme ?? 'just hanging out', recent)
+          totalAi++
+        } catch (_e) {
+          content = scriptedFallback()
+        }
+
+        await supabase.from('messages').insert({
+          session_id: session.id,
+          participant_id: bot.id,
+          display_name: bot.display_name,
+          content,
+          type: 'chat',
+        })
+        // feed our own line back into context for the next bot in this loop
+        recent.push({ display_name: bot.display_name, content })
+
+        await supabase
+          .from('participants')
+          .update({
+            bot_state: {
+              ...bot.bot_state,
+              next_speak_at: nextSpeakAt(),
+              messages_sent: (bot.bot_state?.messages_sent ?? 0) + 1,
+            },
+          })
+          .eq('id', bot.id)
+        totalPosted++
+      }
     }
 
-    return json({ ticked: true, posted, ai_calls: aiCalls, humans_present: humansPresent })
+    return json({ ticked: true, rooms: sessions.length, posted: totalPosted, ai_calls: totalAi })
   } catch (err) {
     console.error('[bot-tick]', err)
     return json({ error: 'internal', detail: String(err) }, 500)

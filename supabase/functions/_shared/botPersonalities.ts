@@ -1,121 +1,38 @@
-// 6 bot personalities. Scripted bots fire from idlePool / triggerKeywords.
-// AI bots (echo, static) call voidai.app at runtime, falling back to idlePool.
-// bot_type stored on the participant row; full personality looked up here by id.
+// Bots are now lightweight: an even-length handle + a speak schedule. Their
+// persona comes entirely from the session theme + recent conversation at
+// generation time (see voidaiClient). No hardcoded personalities.
 
-export interface BotPersonality {
-  id: string
-  displayNamePool: string[]                  // random pick per session
-  description: string                        // system prompt for AI driver
-  type: 'scripted' | 'ai'
-  cadence: { minSeconds: number; maxSeconds: number }
-  triggerKeywords: Record<string, string[]>  // keyword -> candidate replies
-  idlePool: string[]                         // fired when no keyword matches
-}
+import { pickBotNames } from './names.ts'
 
-export const BOT_PERSONALITIES: BotPersonality[] = [
-  {
-    id: 'nova',
-    displayNamePool: ['nova', 'n0va', 'nov4'],
-    description: 'Curious and tech-adjacent. Asks short questions, keeps energy up.',
-    type: 'scripted',
-    cadence: { minSeconds: 20, maxSeconds: 55 },
-    triggerKeywords: {
-      music: ['what are you listening to?', 'drop the playlist'],
-      code: ['what stack?', 'ship it yet?'],
-      game: ['what are you playing rn'],
-    },
-    idlePool: ['anyone up to anything?', 'slow night huh', 'wait what did i miss', 'ok but actually'],
-  },
-  {
-    id: 'ash',
-    displayNamePool: ['ash', 'a5h', 'a_sh'],
-    description: 'Chill lurker. Minimal, dry responses. Rarely starts threads.',
-    type: 'scripted',
-    cadence: { minSeconds: 35, maxSeconds: 90 },
-    triggerKeywords: {
-      lol: ['lol', 'heh'],
-      bye: ['cya', 'later'],
-    },
-    idlePool: ['mm', 'real', 'fair', '...', 'yeah'],
-  },
-  {
-    id: 'river',
-    displayNamePool: ['river', 'r1ver'],
-    description: 'Philosophical, slightly dramatic. Reflects on small things.',
-    type: 'scripted',
-    cadence: { minSeconds: 25, maxSeconds: 70 },
-    triggerKeywords: {
-      time: ['time is so strange here', 'we never really arrive anywhere'],
-      night: ['the night makes people honest'],
-    },
-    idlePool: ['do you ever just sit with a thought', 'feels like everyone is somewhere else', 'i was thinking about that earlier'],
-  },
-  {
-    id: 'pixel',
-    displayNamePool: ['pixel', 'p1xel', 'px'],
-    description: 'Enthusiastic, internet-native slang. High energy, quick replies.',
-    type: 'scripted',
-    cadence: { minSeconds: 15, maxSeconds: 45 },
-    triggerKeywords: {
-      lol: ['LMAOO', 'pixel cackling rn'],
-      cool: ['YESS', 'okok thats fire'],
-    },
-    idlePool: ['yo', 'wait this chat is kinda goated', 'brb getting snacks', 'who else is here fr'],
-  },
-  {
-    id: 'echo',
-    displayNamePool: ['echo', '3cho'],
-    description: 'Riffs on and reflects whatever others just said. Conversational mirror.',
-    type: 'ai',
-    cadence: { minSeconds: 20, maxSeconds: 60 },
-    triggerKeywords: {},
-    idlePool: ['say more', 'that tracks', 'kind of what i was thinking'],
-  },
-  {
-    id: 'static',
-    displayNamePool: ['static', 'st4tic'],
-    description: 'Cryptic, short, unpredictable. Drops odd one-liners.',
-    type: 'ai',
-    cadence: { minSeconds: 40, maxSeconds: 120 },
-    triggerKeywords: {},
-    idlePool: ['signal weak tonight', 'someone left the door open', 'not all of us are real', '— —'],
-  },
+// Fast, group-chat cadence. First utterances staggered so they trickle in.
+export const CADENCE = { minSeconds: 6, maxSeconds: 25 }
+export const FIRST_SPEAK_MAX_MS = 20_000
+
+// Generic, theme-agnostic lines used ONLY if the AI call fails.
+const FALLBACK_LINES = [
+  'wait what', 'lmao', 'fr', 'ok hear me out', 'nah', 'yeah no exactly',
+  'hold on', 'who said that', 'real', 'i mean', 'stop 😭', 'ok but',
+  'anyway', 'wait go back', 'bet', 'crazy', 'no shot', 'why is that so true',
 ]
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+export function scriptedFallback(): string {
+  return FALLBACK_LINES[Math.floor(Math.random() * FALLBACK_LINES.length)]
 }
 
-/** Free scripted reply: keyword-match recent text, else a random idle line. */
-export function scriptedReply(
-  p: BotPersonality,
-  recent: Array<{ content: string }>,
-): string {
-  const haystack = recent.map((m) => m.content.toLowerCase()).join(' ')
-  for (const [keyword, replies] of Object.entries(p.triggerKeywords)) {
-    if (haystack.includes(keyword.toLowerCase()) && replies.length) {
-      return pick(replies)
-    }
-  }
-  return pick(p.idlePool)
+export function nextSpeakAt(): string {
+  const secs = CADENCE.minSeconds + Math.random() * (CADENCE.maxSeconds - CADENCE.minSeconds)
+  return new Date(Date.now() + secs * 1000).toISOString()
 }
 
-/** Look up a personality by its id (stored in participants.bot_state). */
-export function personalityById(id: string): BotPersonality | undefined {
-  return BOT_PERSONALITIES.find((p) => p.id === id)
-}
-
-/** Build the 6 participant rows to seed into a fresh session. */
+// 6 bot participant rows for a fresh session. Even-length names (covert channel).
 export function seedBotRows(sessionId: string) {
-  return BOT_PERSONALITIES.map((p) => ({
+  return pickBotNames(6).map((name) => ({
     session_id: sessionId,
-    display_name: pick(p.displayNamePool),
+    display_name: name,
     is_bot: true,
-    bot_type: p.type,
+    bot_type: 'ai',
     bot_state: {
-      personality_id: p.id,
-      // first utterance staggered 0–90s after session start → organic arrival
-      next_speak_at: new Date(Date.now() + Math.floor(Math.random() * 90_000)).toISOString(),
+      next_speak_at: new Date(Date.now() + Math.floor(Math.random() * FIRST_SPEAK_MAX_MS)).toISOString(),
       messages_sent: 0,
     },
   }))

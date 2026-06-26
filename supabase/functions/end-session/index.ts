@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { seedBotRows } from '../_shared/botPersonalities.ts'
+import { pickTopic } from '../_shared/topics.ts'
 
 const SESSION_LENGTH_SECONDS = Number(Deno.env.get('SESSION_LENGTH_SECONDS') ?? '660')
 
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
     // Start a fresh session immediately (zero downtime) with new bots.
     const { data: next, error: nextErr } = await supabase
       .from('sessions')
-      .insert({})
+      .insert({ topic: pickTopic() })
       .select('id')
       .single()
     if (nextErr) throw nextErr

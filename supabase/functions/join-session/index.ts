@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { seedBotRows } from '../_shared/botPersonalities.ts'
 import { generateDisplayName } from '../_shared/displayNames.ts'
+import { pickTopic } from '../_shared/topics.ts'
 
 const SESSION_LENGTH_SECONDS = 660 // 11 minutes
 const MAX_REAL_USERS = 7
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
     if (!session) {
       const { data: created, error: createErr } = await supabase
         .from('sessions')
-        .insert({})
+        .insert({ topic: pickTopic() })
         .select('id, started_at')
         .single()
       if (createErr) throw createErr

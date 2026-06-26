@@ -41,7 +41,7 @@ export default function MessagesContainer({ messages }) {
 MessagesContainer.propTypes = {
   messages: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.number.isRequired,
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
       type: PropTypes.string.isRequired,
       text: PropTypes.string.isRequired,
       timestamp: PropTypes.instanceOf(Date).isRequired,

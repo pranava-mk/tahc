@@ -114,7 +114,7 @@ export default function Message({ message }) {
 
 Message.propTypes = {
   message: PropTypes.shape({
-    id: PropTypes.number.isRequired,
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     type: PropTypes.oneOf(['chat', 'info', 'emote', 'warn', 'captcha']).isRequired,
     user: PropTypes.string,
     text: PropTypes.string.isRequired,

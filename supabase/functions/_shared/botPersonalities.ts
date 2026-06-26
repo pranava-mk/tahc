@@ -86,6 +86,25 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
+/** Free scripted reply: keyword-match recent text, else a random idle line. */
+export function scriptedReply(
+  p: BotPersonality,
+  recent: Array<{ content: string }>,
+): string {
+  const haystack = recent.map((m) => m.content.toLowerCase()).join(' ')
+  for (const [keyword, replies] of Object.entries(p.triggerKeywords)) {
+    if (haystack.includes(keyword.toLowerCase()) && replies.length) {
+      return pick(replies)
+    }
+  }
+  return pick(p.idlePool)
+}
+
+/** Look up a personality by its id (stored in participants.bot_state). */
+export function personalityById(id: string): BotPersonality | undefined {
+  return BOT_PERSONALITIES.find((p) => p.id === id)
+}
+
 /** Build the 6 participant rows to seed into a fresh session. */
 export function seedBotRows(sessionId: string) {
   return BOT_PERSONALITIES.map((p) => ({

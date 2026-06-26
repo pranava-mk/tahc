@@ -42,7 +42,7 @@ tahc — private 2-person chat disguised as busy "random stranger" group; 6 AI/s
 ## Status
 - Built: Phase 1-4 (backend, live chat + realtime, session rotation, bot engine + random topic + cron).
 - Deployed to Vercel (above).
-- voidai BLOCKED server-side: every completion (all models incl gemini-2.5-flash, both /chat/completions + /responses) returns HTTP 500 `request_failed`; `/v1/credits` + `/v1/usage` also 500. Auth + `/v1/models` work. Not our code/key — voidai account/service. Client hardened (retry + model fallback gemini-2.5-flash→gpt-4o-mini→deepseek-v3 + logs ref_id to function logs). AI auto-activates when voidai recovers; scripted fallback meanwhile.
+- voidai AI bots WORKING: gemini-2.5-flash via `VOIDAI_API_KEY` secret (key was rotated; new one in secret). Verified — `echo` produced a contextual reply referencing the human msg + session topic. Client hardened (retry + model fallback gemini-2.5-flash→gpt-4o-mini→deepseek-v3 + logs ref_id). `MAX_AI_CALLS_PER_TICK=1` (cost cap; tunable in bot-tick). Scripted fallback always on if a call fails.
 - Pending: Phase 5 archive `/~`; Phase 6 polish (remove legacy `useChat`/`mockData`/`HowTo`, fix old `/nick`/`/whisper` hints in ChatInput).
 
 ## Workspaces

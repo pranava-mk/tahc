@@ -38,7 +38,7 @@ Supabase backend for tahc. Single global ephemeral chat room: 7 real-user cap + 
 - Crons: `tahc-bot-tick` 30s, `tahc-end-session` 1min. Call public function URLs, no key embedded.
 - Secrets: `VOIDAI_API_KEY` (+ optional `VOIDAI_MODEL`, `SESSION_LENGTH_SECONDS`) via `supabase secrets set`. NEVER in git/code. `.env.local` (anon key) gitignored.
 - Admin/reset = service_role REST (never commit the key). Mass deletes are guarded.
-- Status: voidai completions fail (account credits) → AI bots fall back to scripted. Auth/model-list works.
+- Status: voidai AI bots WORKING (gemini-2.5-flash, key in secret). If a call fails, scripted fallback. Failures logged `[voidai] ...` to function logs (dashboard). Old keys rotate → must update the `VOIDAI_API_KEY` secret.
 
 ## Available skills
 | Skill | When to use |

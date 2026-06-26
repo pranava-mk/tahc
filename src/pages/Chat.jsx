@@ -1,29 +1,11 @@
-import { useState, useEffect } from 'react'
 import MessagesContainer from '../components/chat/MessagesContainer'
 import ChatInput from '../components/chat/ChatInput'
 import Sidebar from '../components/chat/Sidebar'
+import SessionEndOverlay from '../components/chat/SessionEndOverlay'
 import { useRoom } from '../hooks/useRoom'
 import { useSettings } from '../hooks/useSettings'
 import { Link } from 'react-router-dom'
 import { ArrowLeftIcon, UsersIcon } from '@heroicons/react/24/outline'
-
-const SESSION_LENGTH = 660 // seconds (11 min)
-
-function useCountdown(startedAt) {
-  const [remaining, setRemaining] = useState(null)
-  useEffect(() => {
-    if (!startedAt) return
-    const start = new Date(startedAt).getTime()
-    const tick = () => {
-      const elapsed = (Date.now() - start) / 1000
-      setRemaining(Math.max(0, Math.ceil(SESSION_LENGTH - elapsed)))
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [startedAt])
-  return remaining
-}
 
 function fmt(s) {
   if (s == null) return '--:--'
@@ -33,13 +15,17 @@ function fmt(s) {
 }
 
 export default function Chat() {
-  const { messages, users, sessionStartedAt, handleSendMessage, handleUserClick, clearMessages } = useRoom()
+  const {
+    messages, users, remaining, rotating,
+    handleSendMessage, handleUserClick, clearMessages,
+  } = useRoom()
   const { settings, updateSetting } = useSettings()
-  const remaining = useCountdown(sessionStartedAt)
   const low = remaining != null && remaining <= 60
 
   return (
     <div className="h-screen flex flex-col bg-bg overflow-hidden">
+      {rotating && <SessionEndOverlay />}
+
       <header className="sticky top-0 z-[100] bg-bg/95 backdrop-blur-lg border-b border-border px-8 py-5">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-6">

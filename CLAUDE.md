@@ -30,6 +30,9 @@ tahc — private 2-person chat disguised as busy "random stranger" group; 6 AI/s
 - Backend: Supabase project `tagiuunfgwdbaqeojmgo`. Deno edge functions, Postgres + RLS, Realtime, pg_cron + pg_net.
 - Bots AI: voidai (`gemini-2.5-flash`) via `VOIDAI_API_KEY` function secret. Scripted fallback always.
 
+## Deployment
+- Live: https://lets-tahc.vercel.app/ (Vercel, SPA). Needs Vercel env `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
+
 ## Routes
 - `/` — landing ("drop into a live conversation")
 - `/chat` — live ephemeral chat (`src/pages/Chat.jsx`)
@@ -38,7 +41,9 @@ tahc — private 2-person chat disguised as busy "random stranger" group; 6 AI/s
 
 ## Status
 - Built: Phase 1-4 (backend, live chat + realtime, session rotation, bot engine + random topic + cron).
-- Pending: voidai account credits (AI completions fail → scripted fallback); Vercel deploy; Phase 5 archive `/~`; Phase 6 polish (remove legacy `useChat`/`mockData`/`HowTo`, fix old `/nick`/`/whisper` hints in ChatInput).
+- Deployed to Vercel (above).
+- voidai BLOCKED server-side: every completion (all models incl gemini-2.5-flash, both /chat/completions + /responses) returns HTTP 500 `request_failed`; `/v1/credits` + `/v1/usage` also 500. Auth + `/v1/models` work. Not our code/key — voidai account/service. Client hardened (retry + model fallback gemini-2.5-flash→gpt-4o-mini→deepseek-v3 + logs ref_id to function logs). AI auto-activates when voidai recovers; scripted fallback meanwhile.
+- Pending: Phase 5 archive `/~`; Phase 6 polish (remove legacy `useChat`/`mockData`/`HowTo`, fix old `/nick`/`/whisper` hints in ChatInput).
 
 ## Workspaces
 (See each folder's _context.md for detail.)

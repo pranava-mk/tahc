@@ -36,14 +36,36 @@ Deno.serve(async (req) => {
   )
 
   try {
-    // 1. Find the active session, or create one (+ seed bots).
-    let { data: session } = await supabase
-      .from('sessions')
-      .select('id, started_at')
-      .eq('is_active', true)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // 0. Invite link: if a specific session_id is requested and still active,
+    //    join THAT session (so an invited friend lands in the same room).
+    let requestedId: string | null = null
+    try {
+      const body = await req.json()
+      requestedId = typeof body?.session_id === 'string' ? body.session_id : null
+    } catch { /* no/invalid body — normal join */ }
+
+    let session = null
+    if (requestedId) {
+      const { data } = await supabase
+        .from('sessions')
+        .select('id, started_at')
+        .eq('id', requestedId)
+        .eq('is_active', true)
+        .maybeSingle()
+      session = data ?? null
+    }
+
+    // 1. Otherwise find the active session, or create one (+ seed bots).
+    if (!session) {
+      const { data: active } = await supabase
+        .from('sessions')
+        .select('id, started_at')
+        .eq('is_active', true)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      session = active ?? null
+    }
 
     if (!session) {
       const { data: created, error: createErr } = await supabase

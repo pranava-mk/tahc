@@ -12,7 +12,7 @@
   }
 
   body {
-    @apply font-sans bg-bg text-text antialiased;
+    @apply font-mono bg-bg text-text antialiased;
   }
 
   /* Focus visible for keyboard navigation */
@@ -48,6 +48,15 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-text-secondary/20;
+  }
+
+  /* Live dot pulse */
+  .live-dot {
+    animation: livePulse 2s ease-in-out infinite;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
   }
 }
 

@@ -1,63 +1,88 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowLeftIcon, UsersIcon, LinkIcon, CheckIcon } from '@heroicons/react/24/outline'
 import MessagesContainer from '../components/chat/MessagesContainer'
 import ChatInput from '../components/chat/ChatInput'
-import Sidebar from '../components/chat/Sidebar'
+import OnlinePanel from '../components/chat/OnlinePanel'
 import SessionEndOverlay from '../components/chat/SessionEndOverlay'
 import { useRoom } from '../hooks/useRoom'
-import { useSettings } from '../hooks/useSettings'
-import { Link } from 'react-router-dom'
-import { ArrowLeftIcon, UsersIcon } from '@heroicons/react/24/outline'
 
 function fmt(s) {
   if (s == null) return '--:--'
   const m = Math.floor(s / 60)
-  const sec = String(s % 60).padStart(2, '0')
-  return `${m}:${sec}`
+  return `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
 export default function Chat() {
-  const {
-    messages, users, remaining, rotating,
-    handleSendMessage, handleUserClick, clearMessages,
-  } = useRoom()
-  const { settings, updateSetting } = useSettings()
+  const { messages, users, currentUser, remaining, rotating, notice, inviteUrl, handleSendMessage } = useRoom()
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const low = remaining != null && remaining <= 60
 
+  const copyInvite = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+    } catch {
+      // fallback for non-secure contexts
+      const ta = document.createElement('textarea')
+      ta.value = inviteUrl; document.body.appendChild(ta); ta.select()
+      document.execCommand('copy'); ta.remove()
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1600)
+  }
+
   return (
-    <div className="h-screen flex flex-col bg-bg overflow-hidden">
+    <div className="h-screen flex flex-col bg-bg overflow-hidden font-mono">
       {rotating && <SessionEndOverlay />}
 
-      <header className="sticky top-0 z-[100] bg-bg/95 backdrop-blur-lg border-b border-border px-8 py-5">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="text-text-secondary hover:text-accent transition-quick flex items-center gap-2 text-sm font-mono">
+      {/* Header */}
+      <header className="shrink-0 border-b border-border bg-bg/95 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="text-text-secondary hover:text-accent transition-colors" aria-label="Leave">
               <ArrowLeftIcon className="w-4 h-4" />
-              <span>Back</span>
             </Link>
-            <h1 className="text-lg font-medium tracking-tight text-text">tahc chat</h1>
+            <span className="flex items-center gap-1.5 text-sm text-text">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent live-dot" />
+              tahc
+            </span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className={`font-mono text-xs ${low ? 'text-warning' : 'text-text-secondary'}`}>
+
+          <div className="flex items-center gap-2 text-xs">
+            {/* timer */}
+            <span className={`tabular-nums px-2 py-1 rounded ${low ? 'text-accent' : 'text-text-secondary'}`} title="time left this session">
               {fmt(remaining)}
             </span>
-            <div className="flex items-center gap-2 text-xs text-text-secondary font-mono">
-              <UsersIcon className="w-4 h-4" />
-              <span>{users.length} online</span>
-            </div>
+            {/* invite / copy link */}
+            <button
+              onClick={copyInvite}
+              id="invite-btn"
+              className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors
+                          ${copied ? 'border-success text-success' : 'border-border text-text-secondary hover:border-accent hover:text-accent'}`}
+              title="Copy an invite link to this room (valid this session)"
+            >
+              {copied ? <CheckIcon className="w-3.5 h-3.5" /> : <LinkIcon className="w-3.5 h-3.5" />}
+              <span>{copied ? 'copied' : 'invite'}</span>
+            </button>
+            {/* online toggle */}
+            <button
+              onClick={() => setPanelOpen(true)}
+              id="online-btn"
+              className="flex items-center gap-1 px-2 py-1 rounded border border-border text-text-secondary hover:border-accent hover:text-accent transition-colors"
+              title="Who's online"
+            >
+              <UsersIcon className="w-3.5 h-3.5" />
+              <span className="tabular-nums">{users.length}</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <MessagesContainer messages={messages} />
-        <ChatInput onSendMessage={handleSendMessage} placeholder="Type a message..." />
-        <Sidebar
-          users={users}
-          settings={settings}
-          onUserClick={handleUserClick}
-          onSettingChange={updateSetting}
-          onClearMessages={clearMessages}
-        />
-      </div>
+      <MessagesContainer messages={messages} currentNick={currentUser.nickname} />
+      <ChatInput onSendMessage={handleSendMessage} notice={notice} />
+      <OnlinePanel users={users} open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   )
 }

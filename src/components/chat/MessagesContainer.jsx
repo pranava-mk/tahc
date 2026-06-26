@@ -2,49 +2,33 @@ import { useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import Message from './Message'
 
-export default function MessagesContainer({ messages }) {
-  const messagesEndRef = useRef(null)
-  const containerRef = useRef(null)
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
+export default function MessagesContainer({ messages, currentNick }) {
+  const endRef = useRef(null)
   useEffect(() => {
-    scrollToBottom()
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-y-auto custom-scrollbar bg-bg"
-      id="messages"
-    >
-      <div className="max-w-6xl mx-auto py-8">
+    <div className="flex-1 overflow-y-auto custom-scrollbar bg-bg" id="messages">
+      <div className="max-w-4xl mx-auto py-6">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-text-secondary">
-            <p className="text-sm">No messages yet. Start typing below.</p>
+          <div className="px-4 py-10 text-center text-text-secondary text-xs">
+            <p className="opacity-70">connecting to the room…</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {messages.map((message) => (
-              <Message key={message.id} message={message} />
+          <div className="space-y-0.5">
+            {messages.map((m) => (
+              <Message key={m.id} message={m} isOwn={!!currentNick && m.user === currentNick} />
             ))}
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div ref={endRef} />
       </div>
     </div>
   )
 }
 
 MessagesContainer.propTypes = {
-  messages: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      type: PropTypes.string.isRequired,
-      text: PropTypes.string.isRequired,
-      timestamp: PropTypes.instanceOf(Date).isRequired,
-    })
-  ).isRequired,
+  messages: PropTypes.array.isRequired,
+  currentNick: PropTypes.string,
 }

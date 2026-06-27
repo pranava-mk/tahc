@@ -4,18 +4,20 @@
 
 import { pickBotNames } from './names.ts'
 
-// Fast, group-chat cadence. First utterances staggered so they trickle in.
-export const CADENCE = { minSeconds: 6, maxSeconds: 25 }
-export const FIRST_SPEAK_MAX_MS = 20_000
+// Fast, group-chat cadence.
+export const CADENCE = { minSeconds: 5, maxSeconds: 18 }
 
-// Generic, theme-agnostic lines used ONLY if the AI call fails.
+// Natural reactions used ONLY if an AI call fails. Engaged enough to not break
+// immersion in any theme (true theme content needs the model, which just failed).
 const FALLBACK_LINES = [
-  'wait what', 'lmao', 'fr', 'ok hear me out', 'nah', 'yeah no exactly',
-  'hold on', 'who said that', 'real', 'i mean', 'stop 😭', 'ok but',
-  'anyway', 'wait go back', 'bet', 'crazy', 'no shot', 'why is that so true',
+  'ok that\'s actually a fair point', 'wait say that again', 'nah i\'m dead 😭',
+  'lowkey true', 'ok but hear me out', 'who\'s gonna tell him', 'real talk',
+  'that\'s crazy lol', 'bro 💀', 'ok ok keep going', 'yeah no exactly',
+  'hold on hold on', 'i\'m not even surprised', 'this is sending me', 'be so fr rn',
+  'ok that tracks', 'wait i missed it, what', 'nah that\'s wild', 'say less',
 ]
 
-export function scriptedFallback(): string {
+export function scriptedFallback(_theme?: string): string {
   return FALLBACK_LINES[Math.floor(Math.random() * FALLBACK_LINES.length)]
 }
 
@@ -25,15 +27,20 @@ export function nextSpeakAt(): string {
 }
 
 // 6 bot participant rows for a fresh session. Even-length names (covert channel).
+// First few bots are due almost immediately so a kickoff tick pre-warms the room
+// with banter before the human even types; the rest trickle in.
 export function seedBotRows(sessionId: string) {
-  return pickBotNames(6).map((name) => ({
-    session_id: sessionId,
-    display_name: name,
-    is_bot: true,
-    bot_type: 'ai',
-    bot_state: {
-      next_speak_at: new Date(Date.now() + Math.floor(Math.random() * FIRST_SPEAK_MAX_MS)).toISOString(),
-      messages_sent: 0,
-    },
-  }))
+  return pickBotNames(6).map((name, i) => {
+    const delayMs = i < 3 ? Math.floor(Math.random() * 3000) : 4000 + Math.floor(Math.random() * 10000)
+    return {
+      session_id: sessionId,
+      display_name: name,
+      is_bot: true,
+      bot_type: 'ai',
+      bot_state: {
+        next_speak_at: new Date(Date.now() + delayMs).toISOString(),
+        messages_sent: 0,
+      },
+    }
+  })
 }

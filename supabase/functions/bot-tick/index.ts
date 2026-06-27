@@ -82,16 +82,17 @@ Deno.serve(async (req) => {
         .limit(12)
       const recent = (recentDesc ?? []).reverse()
 
-      for (const bot of due) {
-        if (totalAi >= GLOBAL_CAP) break
-        let content: string
+      const theme = session.theme ?? 'just hanging out'
+      // Generate all due bots' replies in PARALLEL (snappier than sequential).
+      const results = await Promise.all(due.map(async (bot) => {
         try {
-          content = await generateAiReply(bot.display_name, session.theme ?? 'just hanging out', recent)
-          totalAi++
+          return { bot, content: await generateAiReply(bot.display_name, theme, recent), ai: true }
         } catch (_e) {
-          content = scriptedFallback()
+          return { bot, content: scriptedFallback(theme), ai: false }
         }
+      }))
 
+      for (const { bot, content, ai } of results) {
         await supabase.from('messages').insert({
           session_id: session.id,
           participant_id: bot.id,
@@ -99,9 +100,6 @@ Deno.serve(async (req) => {
           content,
           type: 'chat',
         })
-        // feed our own line back into context for the next bot in this loop
-        recent.push({ display_name: bot.display_name, content })
-
         await supabase
           .from('participants')
           .update({
@@ -113,6 +111,7 @@ Deno.serve(async (req) => {
           })
           .eq('id', bot.id)
         totalPosted++
+        if (ai) totalAi++
       }
     }
 

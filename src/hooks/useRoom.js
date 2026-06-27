@@ -78,6 +78,11 @@ export function useRoom(slug) {
           (payload) => setMessages((prev) => prev.some((m) => m.id === payload.new.id) ? prev : [...prev, mapMessage(payload.new)]))
         .subscribe()
 
+      // Pre-warm: kick the bots so the room is already mid-banter on entry.
+      const prewarm = () => fetch(`${FUNCTIONS_URL}/bot-tick`, { method: 'POST', headers: { Authorization: `Bearer ${ANON}` } }).catch(() => {})
+      setTimeout(() => { if (!cancelled) prewarm() }, 2500)
+      setTimeout(() => { if (!cancelled) prewarm() }, 7000)
+
       // Reconcile messages posted during the brief subscription-setup gap.
       setTimeout(async () => {
         if (cancelled) return

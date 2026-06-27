@@ -5,9 +5,11 @@ const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
 const SESSION_LENGTH = Number(import.meta.env.VITE_SESSION_SECONDS ?? '660')
 const MAX_LEN = 500
-const BURST_MAX = 6
-const BURST_WINDOW = 5000
-const DUP_WINDOW = 3000
+// Generous — only blocks deliberate flooding, never normal fast chatting.
+const BURST_MAX = 12
+const BURST_WINDOW = 8000
+const REPEAT_MAX = 4      // same exact message this many times in a row → block
+const REPEAT_WINDOW = 5000
 
 function mapMessage(row) {
   return {
@@ -141,16 +143,31 @@ export function useRoom(slug) {
     if (!content) return
 
     const now = Date.now()
-    if (content === lastSent.current.text && now - lastSent.current.at < DUP_WINDOW) { flashNotice('Easy — you just sent that.'); return }
+    // Allow repeats (real chat repeats words) — only block the same exact line spammed.
+    if (content === lastSent.current.text && now - lastSent.current.at < REPEAT_WINDOW) {
+      lastSent.current.count = (lastSent.current.count || 1) + 1
+      if (lastSent.current.count >= REPEAT_MAX) { flashNotice('ok we get it 😅'); return }
+    } else {
+      lastSent.current = { text: content, count: 1 }
+    }
+    lastSent.current.text = content
+    lastSent.current.at = now
+    // Generous flood guard.
     sendTimes.current = sendTimes.current.filter((t) => now - t < BURST_WINDOW)
-    if (sendTimes.current.length >= BURST_MAX) { flashNotice('Slow down a sec.'); return }
+    if (sendTimes.current.length >= BURST_MAX) { flashNotice('whoa, ease up a sec'); return }
     sendTimes.current.push(now)
-    lastSent.current = { text: content, at: now }
 
     const { data, error } = await supabase.from('messages')
       .insert({ session_id: s.session_id, participant_id: s.participant_id, display_name: s.display_name, content, type })
       .select('id, display_name, content, type, sent_at').single()
-    if (error) { console.error('[useRoom] send failed:', error); return }
+    if (error) {
+      console.error('[useRoom] send failed:', error)
+      // Surface the failure instead of silently dropping it (the old bug).
+      if (error.code === '42501') setStatus('ended')        // room no longer active
+      else if (error.code === 'P0001' || /rate/i.test(error.message || '')) flashNotice('slow down — too many messages')
+      else flashNotice("didn't send — try again")
+      return
+    }
     if (data) setMessages((prev) => prev.some((m) => m.id === data.id) ? prev : [...prev, mapMessage(data)])
     pokeBots() // let the bots react fast
   }, [flashNotice, pokeBots])

@@ -4,12 +4,14 @@
 // only when all attempts fail (caller uses a scripted fallback line).
 
 const ENDPOINT = 'https://api.voidai.app/v1/chat/completions'
-const TIMEOUT_MS = 6000
-const RETRIES_PER_MODEL = 1
+// Keep latency low so a slow voidai fails fast to the natural fallback rather
+// than stalling a whole tick. Worst case per bot ≈ 2 models × 4.5s = 9s.
+const TIMEOUT_MS = 4500
+const RETRIES_PER_MODEL = 0
 
 function modelChain(): string[] {
   const primary = Deno.env.get('VOIDAI_MODEL') ?? 'gemini-2.5-flash'
-  return [...new Set([primary, 'gpt-4o-mini', 'deepseek-v3'])]
+  return [...new Set([primary, 'gpt-4o-mini'])]
 }
 
 interface RecentMessage {

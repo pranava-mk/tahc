@@ -4,23 +4,19 @@ import Message from './Message'
 
 export default function MessagesContainer({ messages, currentNick }) {
   const endRef = useRef(null)
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar bg-bg" id="messages">
-      <div className="max-w-4xl mx-auto py-6">
+    <div className="flex-1 overflow-y-auto scroll-brutal" id="messages">
+      <div className="max-w-3xl mx-auto py-5 space-y-2">
         {messages.length === 0 ? (
-          <div className="px-4 py-10 text-center text-text-secondary text-xs">
-            <p className="opacity-70">connecting to the room…</p>
+          <div className="flex justify-center px-4 py-10">
+            <span className="tag-brutal bg-card animate-wobble">dropping you in…</span>
           </div>
         ) : (
-          <div className="space-y-0.5">
-            {messages.map((m) => (
-              <Message key={m.id} message={m} isOwn={!!currentNick && m.user === currentNick} />
-            ))}
-          </div>
+          messages.map((m) => (
+            <Message key={m.id} message={m} isOwn={!!currentNick && m.user === currentNick} />
+          ))
         )}
         <div ref={endRef} />
       </div>

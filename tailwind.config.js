@@ -1,109 +1,68 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Dark mode only (primary theme)
-        bg: '#191919',
-        'bg-elevated': '#2A2A2A',
-        text: '#D4D4D4',
-        'text-secondary': '#9B9B9B',
-        border: 'rgba(255, 255, 255, 0.05)',
-
-        // Red accent (Nothing OS)
-        accent: '#FF3B30',
-        'accent-hover': '#FF5247',
-        'accent-dim': 'rgba(255, 59, 48, 0.1)',
-
-        // Semantic colors (minimal set)
-        success: '#4F9768',
-        error: '#E06C75',
-        info: '#447ACB',
-        warning: '#E5C07B',
+        // Neo-brutalism: cream paper, ink lines, vibrant blocks.
+        paper: '#FDF3DD',
+        card: '#FFFFFF',
+        ink: '#111111',
+        muted: '#6B6B6B',
+        // vibrant accents
+        blue: '#3B5BFF',
+        pink: '#FF4D8D',
+        lime: '#B8FF3B',
+        yellow: '#FFD43B',
+        orange: '#FF7A3B',
+        purple: '#9D4EDD',
+        cyan: '#54E6E0',
+        // semantic aliases (kept so older refs don't break)
+        bg: '#FDF3DD',
+        text: '#111111',
+        'text-secondary': '#6B6B6B',
+        accent: '#FF4D8D',
+        border: '#111111',
+        success: '#1FA84F',
+        error: '#E5484D',
+        warning: '#F76808',
+        info: '#3B5BFF',
       },
-
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Helvetica', 'Arial', 'sans-serif'],
-        mono: ['SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', 'Courier New', 'monospace'],
+        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        sans: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        mono: ['"Space Mono"', 'ui-monospace', 'monospace'],
       },
-
-      // Enhanced spacing for breathability
-      spacing: {
-        '0.5': '2px',
-        '1': '4px',
-        '1.5': '6px',
-        '2': '8px',
-        '3': '12px',
-        '4': '16px',
-        '5': '20px',
-        '6': '24px',
-        '7': '28px',
-        '8': '32px',
-        '10': '40px',
-        '12': '48px',
-        '14': '56px',
-        '16': '64px',
-        '20': '80px',
-        '24': '96px',
+      boxShadow: {
+        brutal: '4px 4px 0 0 #111111',
+        'brutal-sm': '2px 2px 0 0 #111111',
+        'brutal-lg': '7px 7px 0 0 #111111',
+        'brutal-pink': '4px 4px 0 0 #FF4D8D',
+        'brutal-blue': '4px 4px 0 0 #3B5BFF',
+        'brutal-inset': 'inset 3px 3px 0 0 rgba(17,17,17,0.12)',
       },
-
-      letterSpacing: {
-        tighter: '-0.02em',
-        tight: '-0.01em',
-        wider: '0.01em',
-        widest: '0.02em',
-      },
-
-      // Minimal motion system
-      transitionDuration: {
-        'instant': '50ms',
-        'fast': '100ms',
-        'quick': '150ms',
-        'normal': '200ms',
-        'smooth': '300ms',
-        'medium': '350ms',
-        'deliberate': '500ms',
-      },
-
+      borderWidth: { 3: '3px' },
+      borderRadius: { brutal: '14px', 'brutal-sm': '8px' },
+      letterSpacing: { tightest: '-0.04em', tighter: '-0.02em' },
       transitionTimingFunction: {
-        'expressive-effects': 'cubic-bezier(0.34, 0.80, 0.34, 1.00)',
-        'expressive': 'cubic-bezier(0.38, 1.21, 0.22, 1.00)',
-        'standard': 'cubic-bezier(0.27, 1.06, 0.18, 1.00)',
+        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        snappy: 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
-
       animation: {
-        'fade-in': 'fadeIn 300ms cubic-bezier(0.34, 0.80, 0.34, 1.00)',
-        'slide-up': 'slideUp 500ms cubic-bezier(0.38, 1.21, 0.22, 1.00)',
+        'fade-in': 'fadeIn 260ms cubic-bezier(0.22,1,0.36,1)',
+        'pop-in': 'popIn 320ms cubic-bezier(0.34,1.56,0.64,1)',
+        'slide-up': 'slideUp 360ms cubic-bezier(0.22,1,0.36,1)',
+        marquee: 'marquee 22s linear infinite',
+        wobble: 'wobble 2.4s ease-in-out infinite',
+        blink: 'blink 1.1s steps(2,start) infinite',
       },
-
       keyframes: {
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(4px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-      },
-
-      // Minimal border radius (straighter edges)
-      borderRadius: {
-        'sm': '2px',
-        'DEFAULT': '3px',
-        'md': '4px',
-        'lg': '6px',
-        'xl': '8px',
-      },
-
-      // Line height for better readability
-      lineHeight: {
-        'relaxed': '1.7',
-        'loose': '1.8',
+        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+        popIn: { '0%': { opacity: '0', transform: 'translateY(6px) scale(0.96)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } },
+        slideUp: { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        marquee: { '0%': { transform: 'translateX(0)' }, '100%': { transform: 'translateX(-50%)' } },
+        wobble: { '0%,100%': { transform: 'rotate(-2deg)' }, '50%': { transform: 'rotate(2deg)' } },
+        blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.2' } },
       },
     },
   },

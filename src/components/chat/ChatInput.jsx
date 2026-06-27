@@ -1,75 +1,51 @@
 import { useState, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { PaperAirplaneIcon } from '@heroicons/react/24/outline'
+import { PaperAirplaneIcon } from '@heroicons/react/24/solid'
 
 const MAX_LEN = 500
 
-export default function ChatInput({ onSendMessage, placeholder = 'Type a message…', notice = '' }) {
+export default function ChatInput({ onSendMessage, placeholder = 'type something…', notice = '' }) {
   const [value, setValue] = useState('')
   const ref = useRef(null)
 
-  const send = () => {
-    if (value.trim()) {
-      onSendMessage(value)
-      setValue('')
-    }
-  }
-
+  const send = () => { if (value.trim()) { onSendMessage(value); setValue('') } }
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
     else if (e.key === 'Escape') { setValue(''); ref.current?.blur() }
   }
-
   useEffect(() => {
-    if (ref.current) {
-      ref.current.style.height = 'auto'
-      ref.current.style.height = `${Math.min(ref.current.scrollHeight, 160)}px`
-    }
+    if (ref.current) { ref.current.style.height = 'auto'; ref.current.style.height = `${Math.min(ref.current.scrollHeight, 140)}px` }
   }, [value])
-
   const near = value.length > MAX_LEN * 0.8
 
   return (
-    <div className="border-t border-border bg-bg" id="footer">
-      <div className="max-w-4xl mx-auto px-4 py-3">
+    <div className="shrink-0 border-t-3 border-ink bg-paper" id="footer">
+      <div className="max-w-3xl mx-auto px-3 py-3">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
-              ref={ref}
-              value={value}
-              maxLength={MAX_LEN}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder={placeholder}
-              rows="1"
-              id="chatinput"
-              className="w-full resize-none bg-bg-elevated border border-border rounded-md
-                         px-3 py-2.5 text-sm font-mono text-text placeholder:text-text-secondary/50
-                         focus:outline-none focus:border-accent/50 transition-colors"
-              style={{ minHeight: '44px', maxHeight: '160px' }}
+              ref={ref} value={value} maxLength={MAX_LEN} rows="1" id="chatinput"
+              onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder}
+              className="w-full resize-none bg-card border-3 border-ink rounded-brutal-sm shadow-brutal-sm
+                         px-3 py-2.5 text-sm font-mono text-ink placeholder:text-muted/70
+                         focus:outline-none focus:-translate-x-0.5 focus:-translate-y-0.5 focus:shadow-brutal transition-all"
+              style={{ minHeight: '46px', maxHeight: '140px' }}
             />
             {value.length > 0 && (
-              <span className={`absolute bottom-2 right-3 text-[10px] tabular-nums ${near ? 'text-warning' : 'text-text-secondary/50'}`}>
+              <span className={`absolute bottom-2 right-2.5 font-mono text-[10px] font-bold tabular-nums ${near ? 'text-warning' : 'text-muted'}`}>
                 {value.length}/{MAX_LEN}
               </span>
             )}
           </div>
-          <button
-            onClick={send}
-            disabled={!value.trim()}
-            id="send-btn"
-            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-md text-sm font-mono
-                       border border-border text-text hover:border-accent hover:text-accent
-                       disabled:opacity-30 disabled:hover:border-border disabled:hover:text-text
-                       transition-colors active:scale-[0.98]"
-          >
-            <span>send</span>
-            <PaperAirplaneIcon className="w-3.5 h-3.5" />
+          <button onClick={send} disabled={!value.trim()} id="send-btn"
+            className="btn-brutal btn-blue h-[46px] px-4 disabled:opacity-40 disabled:shadow-brutal-sm disabled:translate-x-0 disabled:translate-y-0">
+            <span className="hidden sm:inline">send</span>
+            <PaperAirplaneIcon className="w-4 h-4" />
           </button>
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[10px] text-text-secondary/50">
-          <span>enter to send · shift+enter newline · <span className="text-text-secondary/70">/me</span> for an action</span>
-          {notice && <span className="text-warning">{notice}</span>}
+        <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-muted">
+          <span>enter ↵ send · shift+enter newline · <span className="text-ink font-bold">/me</span> action</span>
+          {notice && <span className="tag-brutal bg-yellow py-0 animate-pop-in">{notice}</span>}
         </div>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 
-// Full-screen transition shown while the room rotates to a new session.
 export default function SessionEndOverlay() {
   const [count, setCount] = useState(3)
   useEffect(() => {
@@ -9,12 +8,10 @@ export default function SessionEndOverlay() {
   }, [])
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-bg/95 backdrop-blur-lg animate-fade-in">
-      <div className="text-center">
-        <p className="text-lg font-medium text-text mb-2">Session ended</p>
-        <p className="text-sm text-text-secondary font-mono">
-          New session in {count}…
-        </p>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-paper/90 backdrop-blur-sm animate-fade-in">
+      <div className="card-brutal !shadow-brutal-lg bg-pink px-10 py-8 text-center -rotate-1 animate-pop-in">
+        <p className="font-display font-bold text-2xl text-ink">that's a wrap ✺</p>
+        <p className="mt-2 font-mono text-sm text-ink/70">room resets in {count}…</p>
       </div>
     </div>
   )

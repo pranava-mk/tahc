@@ -1,43 +1,37 @@
-// Covert channel: human display names are ODD length, bot names are EVEN length.
-// Both draw from the SAME natural handle pool so style is never a tell — only
-// the character count parity distinguishes them. (You can spot the humans by
-// counting letters: odd = real.)
+// Covert channel: bot names are EXACTLY 4 letters (even). Human names are ODD
+// length (3, 5, ...). Same casual-handle style — only the letter count tells
+// them apart. Count the letters: 4 = bot, odd = real person.
 
 export const ODD = 1
 export const EVEN = 0
 
-const POOL = [
-  // short
-  'sam', 'neo', 'kai', 'jay', 'rey', 'sid', 'vik', 'dan', 'leo', 'max',
-  'dev', 'ria', 'ana', 'mia', 'jin', 'rob', 'tom', 'amy', 'eli', 'ito',
-  // 4 (even)
+// Exactly-4-letter handles for bots.
+const FOUR = [
   'omar', 'zara', 'finn', 'theo', 'nina', 'lena', 'ravi', 'tina', 'asha', 'kira',
   'noah', 'milo', 'ezra', 'cole', 'jude', 'remy', 'rhea', 'anya', 'sara', 'beck',
-  'kobe', 'alex', 'jess', 'nora', 'enzo', 'lola', 'yuki', 'demi',
-  // 5 (odd)
-  'rahul', 'kiran', 'arjun', 'priya', 'manny', 'devon', 'sasha', 'tariq', 'omari', 'paolo',
-  'hiro_', 'zenya', 'bobby', 'carla', 'diego',
-  // 6 (even)
-  'aditya', 'sanjay', 'rohan_', 'farhan', 'tyrone', 'marcus', 'kelvin', 'naveen',
-  // longer handles
-  'night_owl', 'the_dude', 'lone_wolf', 'big_mike', 'dr_sus', 'lil_guy', 'mr_blue',
+  'kobe', 'alex', 'jess', 'nora', 'enzo', 'lola', 'yuki', 'demi', 'dani', 'levi',
+  'otis', 'kian', 'raya', 'nico', 'maya', 'ivan', 'juno', 'bram',
 ]
 
-function len(n) { return n.length }
+// Odd-length handles for humans (3 / 5 / longer).
+const ODD_POOL = [
+  'sam', 'neo', 'kai', 'jay', 'rey', 'sid', 'vik', 'dan', 'leo', 'max',
+  'dev', 'ria', 'ana', 'mia', 'jin', 'rob', 'tom', 'amy', 'eli',
+  'rahul', 'kiran', 'arjun', 'priya', 'manny', 'devon', 'sasha', 'tariq',
+  'omari', 'paolo', 'bobby', 'carla', 'diego', 'tessa', 'milan',
+  'night_owl', 'lone_wolf', 'mr_blue',
+]
 
-// Pick a random name of the wanted parity, not in `exclude`.
+function poolFor(parity) { return parity === EVEN ? FOUR : ODD_POOL }
+
 export function generateName(parity, exclude = []) {
   const ex = new Set(exclude)
-  const cands = POOL.filter((n) => len(n) % 2 === parity && !ex.has(n))
-  if (cands.length === 0) {
-    // fallback: take any of right parity, append a digit if needed
-    const base = POOL[Math.floor(Math.random() * POOL.length)]
-    return len(base) % 2 === parity ? base : base + Math.floor(Math.random() * 10)
-  }
-  return cands[Math.floor(Math.random() * cands.length)]
+  const cands = poolFor(parity).filter((n) => !ex.has(n))
+  const pool = cands.length ? cands : poolFor(parity)
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
-// 6 distinct EVEN-length names for the bots in a session.
+// 6 distinct 4-letter names for the bots in a session.
 export function pickBotNames(count = 6) {
   const names = []
   let guard = 0

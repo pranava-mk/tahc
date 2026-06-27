@@ -1,54 +1,53 @@
 # Backend
 
 ## What this is for
-Supabase backend for tahc. Single global ephemeral chat room: 7 real-user cap + 6 bots, 11-min sessions, realtime, archived + rotated. Deno edge functions + Postgres/RLS + Realtime + pg_cron. Project ref `tagiuunfgwdbaqeojmgo`. Full architecture: root `PLAN.md`.
+Supabase backend for tahc. Slug-keyed ephemeral rooms: each `/<slug>` is its own 11-min themed room (7 real-user cap + 6 AI bots), archived + ended on expiry. Deno edge functions + Postgres/RLS + Realtime + pg_cron. Project ref `tagiuunfgwdbaqeojmgo`.
 
 ## Folder contents
 | Path | What it holds |
 |------|---------------|
-| `functions/join-session/` | Find/create active session (+ random topic, seed 6 bots staggered), enforce 7 real-user cap, issue anon `client_token` + display_name. Public (`--no-verify-jwt`) |
-| `functions/end-session/` | Server-authoritative rotation: archive transcript → `sessions.archive`, delete msgs, retire participants, end session, hand off NEW session only if real users present |
-| `functions/bot-tick/` | Fire due bots: 4 scripted (free), 2 AI (voidai). Cost-gated |
-| `functions/_shared/` | `botPersonalities.ts` (6 bots, scriptedReply, seedBotRows), `displayNames.ts`, `topics.ts` (30 topics), `voidaiClient.ts` (gemini-2.5-flash, 5s timeout, throws→fallback) |
-| `migrations/*.sql` | Schema, RLS, view, RLS fix, topic col, 2 crons (timestamped) |
-| `config.toml` | supabase init config |
-| `.temp/` | CLI state (gitignored) |
+| `functions/join-session/` | Join/create a slug room. Active slug → join; ended <11h ago → `slug_expired` (410); else create (theme + 6 bots). 7-user cap. Human gets an ODD-length name |
+| `functions/end-session/` | Ends ALL expired active rooms: archive→`sessions.archive`, delete msgs, retire participants, `is_active=false`. No recreate |
+| `functions/bot-tick/` | Drives bots across all LIVE rooms. Parallel AI gen per room, themed personas, cost-gated |
+| `functions/_shared/` | `names.ts` (handle pool + parity: generateName(ODD/EVEN), pickBotNames), `themes.ts` (18 themes, pickTheme), `botPersonalities.ts` (seedBotRows, scriptedFallback, nextSpeakAt, CADENCE), `voidaiClient.ts` (gemini-2.5-flash themed group-chat prompt) |
+| `migrations/*.sql` | Schema, RLS, view, RLS fix, slug+theme cols, crons (timestamped) |
+| `config.toml` | supabase init |
 
 ## Data model
-- `sessions` (id, started_at, ended_at, is_active, user_count, archive jsonb, topic)
-- `participants` (id, session_id, display_name, is_bot, bot_type, joined_at, left_at, client_token, bot_state jsonb={personality_id,next_speak_at,messages_sent})
+- `sessions` (id, started_at, ended_at, is_active, archive jsonb, **slug**, **theme**)
+- `participants` (id, session_id, display_name, is_bot, bot_type, joined_at, left_at, client_token, bot_state jsonb={next_speak_at, messages_sent})
 - `messages` (id, session_id, participant_id, display_name, content, type, sent_at)
-- View `room_participants` — sanitized crowd (no is_bot/client_token); how frontend reads roster.
+- View `room_participants` — sanitized crowd (no is_bot); how frontend reads the roster.
+
+## Covert channel
+Human names ODD length, bot names EVEN. Same pool (`names.ts`). join-session→generateName(ODD); seedBotRows→pickBotNames (EVEN). Spot humans by counting letters.
+
+## Liveliness
+- cron `tahc-bot-tick` every 15s; `tahc-end-session` every minute.
+- Pre-warm: first 3 bots due within ~3s; client pokes bot-tick on entry + after each human send.
+- bot-tick: AI only for rooms with human activity in last 5 min; parallel gen; MAX_PER_ROOM_TICK=3, GLOBAL_CAP=10.
+- voidaiClient: 2 models (gemini-2.5-flash→gpt-4o-mini), no retry, 4.5s timeout → slow voidai fails fast to natural fallback (`scriptedFallback`).
 
 ## Routing table
 | Task | Read | Skip | Skill |
 |------|------|------|-------|
-| Edit join/cap/identity | `functions/join-session/index.ts` + `_shared/` | — | `supabase:edge-function-new` |
-| Edit rotation/archive | `functions/end-session/index.ts` | — | — |
-| Edit bot behaviour | `functions/bot-tick/index.ts` + `_shared/botPersonalities.ts` + `_shared/voidaiClient.ts` | — | — |
-| Add/change bots or topics | `_shared/botPersonalities.ts` / `_shared/topics.ts` | — | — |
-| Schema/RLS change | new `migrations/<ts>_<slug>.sql` | edit applied migrations | `supabase:types-gen` |
-| Frontend ↔ DB contract | this file + `../src/hooks/useRoom.js` | — | — |
+| Join / slug / cooldown / cap / human name | `functions/join-session/index.ts` + `_shared/names.ts` + `_shared/themes.ts` | — | `supabase:edge-function-new` |
+| Rotation / archive | `functions/end-session/index.ts` | — | — |
+| Bot pacing / cost / parallel | `functions/bot-tick/index.ts` | — | — |
+| Bot voice / prompt / model / fallback | `_shared/voidaiClient.ts` + `_shared/botPersonalities.ts` | — | — |
+| Themes / names | `_shared/themes.ts` / `_shared/names.ts` | — | — |
+| Schema / RLS change | new `migrations/<ts>_<slug>.sql` | edit applied migrations | `supabase:types-gen` |
 
 ## Conventions / gotchas
-- **RLS sessions trap**: policies must NOT subquery `sessions` (creator-only RLS shadows it for anon). Use `is_session_active(uuid)` SECURITY DEFINER fn. See `20260626020000`.
-- **Hide bots**: never expose `is_bot` to client. Frontend reads `room_participants` view only.
-- Functions deploy: `supabase functions deploy <name> --no-verify-jwt` (all 3 are public; server-authoritative).
-- Migrations: `supabase db push`. Never edit an applied migration (won't re-run) — add a new one. pg_cron schedule: `'<N> seconds'` only for N<60, else cron syntax `* * * * *`.
-- Crons: `tahc-bot-tick` 30s, `tahc-end-session` 1min. Call public function URLs, no key embedded.
-- Secrets: `VOIDAI_API_KEY` (+ optional `VOIDAI_MODEL`, `SESSION_LENGTH_SECONDS`) via `supabase secrets set`. NEVER in git/code. `.env.local` (anon key) gitignored.
+- **RLS sessions trap**: never subquery `sessions` in a policy (creator-only RLS shadows it for anon). Use `is_session_active(uuid)` SECURITY DEFINER fn.
+- **Hide bots**: never expose `is_bot`. Frontend reads `room_participants` view only. Realtime on a VIEW isn't supported — subscribe to `messages` table; users load on join.
+- Deploy: `supabase functions deploy <name> --no-verify-jwt` (all 3 public, server-authoritative). Migrations: `supabase db push`; never edit an applied migration. pg_cron: `'<N> seconds'` only for N<60, else cron syntax.
+- Secrets via `supabase secrets set`: `VOIDAI_API_KEY` (+ optional `VOIDAI_MODEL`, `SESSION_LENGTH_SECONDS`). NEVER in git. Rotating the voidai key → re-set the secret.
 - Admin/reset = service_role REST (never commit the key). Mass deletes are guarded.
-- Status: voidai AI bots WORKING (gemini-2.5-flash, key in secret). If a call fails, scripted fallback. Failures logged `[voidai] ...` to function logs (dashboard). Old keys rotate → must update the `VOIDAI_API_KEY` secret.
 
 ## Available skills
 | Skill | When to use |
 |-------|-------------|
-| `supabase:edge-function-new` | Scaffold a new Deno edge function |
-| `supabase:types-gen` | Generate TS types from DB schema |
-| `verify` | Confirm a backend change end-to-end in browser |
-
-## Suggested skills (not yet built)
-| Skill name | Trigger |
-|------------|---------|
-| supabase-migrate | Author + push a migration with the applied-immutability + cron-syntax rules baked in |
-| room-reset | Safely deactivate the active session (dev cleanup) |
+| `supabase:edge-function-new` | New Deno edge function |
+| `supabase:types-gen` | TS types from schema |
+| `verify` | Confirm a change end-to-end in browser |

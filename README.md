@@ -29,13 +29,28 @@ Supabase backend (Postgres, Realtime, Edge Functions, pg_cron).
 
 ## 🚀 Getting Started
 
+One command, nothing pre-cloned — checks/installs git, node & npm if
+missing (asks before touching your system), clones the repo, installs
+deps, and tells you the one manual step left (Supabase credentials):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pranava-mk/tahc/main/install.sh | bash
+```
+
+Opens at **http://localhost:3000** once you've filled in your Supabase
+credentials in `.env.local` (the installer creates it from
+`.env.local.example` and prints exactly what's needed).
+
+### Already cloned?
+
 ```bash
 npm install
 cp .env.local.example .env.local   # fill in your Supabase project URL + anon key
 npm run dev
 ```
 
-Opens at **http://localhost:3000**.
+Or just run `./install.sh` from inside the repo — it detects it's already
+cloned and skips straight to `npm install`.
 
 ### Requirements
 
